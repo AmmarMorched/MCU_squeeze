@@ -1,0 +1,171 @@
+Ground rules for 1 month:
+    • No feature creep — MVP only 
+    • ESP32-S3 only — no other targets yet 
+    • PTQ only — no QAT for now 
+    • .h5 and .onnx only — no other formats yet 
+    • CLI only — no UI yet 
+
+The 4 Week Roadmap:
+
+Week 1 — Foundation
+Goal: model goes in, clean ONNX comes out, graph is analyzed
+Day 1-2: Project setup
+  - GitHub repo
+  - Python package structure
+  - CLI skeleton with click
+  - virtual environment + dependencies
+
+Day 3-4: Format ingestion
+  - .onnx passthrough + validation
+  - .h5 → onnx via tf2onnx
+  - basic error handling for both
+
+Day 5-7: ONNX graph analyzer
+  - extract all ops from graph
+  - extract input/output shapes
+  - estimate model size in KB
+  - estimate peak activation RAM
+  - load ESP32-S3 supported ops table
+  - flag unsupported ops
+Deliverable: mcusqueeze --model model.h5 --analyze prints a clean graph report.
+
+Week 2 — Quantization Pipeline
+Goal: float32 model → int8 quantized model
+Day 8-9: Calibration dataset loader
+  - accept folder of images
+  - preprocessing pipeline (resize, normalize)
+  - generator for ONNX Runtime
+
+Day 10-12: PTQ quantization
+  - onnxruntime.quantization
+  - static quantization with calibration
+  - per-channel quantization
+  - output: quantized .onnx
+
+Day 13-14: Quantization validation
+  - compare accuracy before/after on calibration set
+  - report accuracy delta
+  - report size reduction
+  - handle quantization failures gracefully
+Deliverable: mcusqueeze --model model.h5 --calib ./data --quantize outputs quantized model + accuracy report.
+
+Week 3 — ESP32-S3 Conversion + Feasibility
+Goal: quantized model → ESP32-S3 ready + feasibility report
+Day 15-17: ESP32-S3 conversion
+  - quantized onnx → tflite (as intermediate)
+  - tflite → ESP-DL compatible format
+  - handle conversion failures with clear messages
+  - validate output
+
+Day 18-19: Feasibility engine
+  - Flash check (exact)
+  - RAM check (estimated peak activation)
+  - Latency estimation (MAC-based)
+  - Ops compatibility check against ESP-DL table
+  - Overall pass/fail verdict
+
+Day 20-21: Feasibility report output
+  - clean terminal output with rich
+  - color coded (green/yellow/red)
+  - specific failure reasons
+  - suggestions when failing
+Deliverable: full pipeline works end to end, feasibility report printed cleanly.
+
+Week 4 — Hardening + Packaging
+Goal: tool that a real engineer can install and use without help
+Day 22-23: Error handling pass
+  - every failure point has a clear message
+  - no silent crashes
+  - custom layer detection + clear message
+  - unsupported op explanation
+
+Day 24-25: Edge case testing
+  - test with 5+ different model architectures
+  - MobileNetV2, ResNet18, simple CNN, LSTM, custom model
+  - fix what breaks
+
+Day 26-27: Packaging
+  - pip installable package
+  - pyproject.toml / setup.py
+  - README with clear examples
+  - requirements pinned
+
+Day 28-29: Documentation
+  - CLI help text
+  - supported ops table documented
+  - known limitations clearly stated
+  - example models + calibration data provided
+
+Day 30: Ship
+  - PyPI publish
+  - GitHub release v0.1.0
+  - Post on LinkedIn / embedded AI communities
+  - Reddit: r/MachineLearning, r/embedded, r/esp32
+
+
+mcusqueeze/
+├── mcusqueeze/
+│   ├── __init__.py
+│   ├── cli.py              # click CLI entry point
+│   ├── ingestion/
+│   │   ├── loader.py       # format detection + loading
+│   │   ├── h5_converter.py # .h5 → onnx
+│   │   └── validator.py    # onnx validation
+│   ├── analysis/
+│   │   ├── graph.py        # op extraction, shape analysis
+│   │   ├── memory.py       # RAM / Flash estimation
+│   │   └── ops_table.py    # ESP32-S3 supported ops
+│   ├── quantization/
+│   │   ├── calibration.py  # dataset loader
+│   │   └── ptq.py          # PTQ pipeline
+│   ├── conversion/
+│   │   └── esp32s3.py      # → ESP-DL format
+│   ├── feasibility/
+│   │   └── checker.py      # full feasibility engine
+│   └── report/
+│       └── printer.py      # rich terminal output
+├── tests/
+├── examples/
+│   ├── models/
+│   └── calibration_data/
+├── README.md
+├── pyproject.toml
+└── requirements.txt
+
+
+The CLI experience you're building toward:
+
+# Analyze only
+mcusqueeze analyze --model model.h5
+
+# Full pipeline
+mcusqueeze run \
+  --model model.h5 \
+  --calib ./calibration_images \
+  --target esp32s3 \
+  --output ./output
+
+# Output:
+┌─────────────────────────────────────┐
+│         mcusqueeze v0.1.0           │
+├─────────────────────────────────────┤
+│ Model Analysis                      │
+│   Format:     Keras .h5             │
+│   Ops:        Conv2D, ReLU, Dense   │
+│   Parameters: 2.3M                  │
+│   Size:       8.9MB (float32)       │
+├─────────────────────────────────────┤
+│ Quantization                        │
+│   Method:     PTQ int8              │
+│   Size:       2.3MB ✓               │
+│   Accuracy Δ: -0.8%                 │
+├─────────────────────────────────────┤
+│ Feasibility — ESP32-S3              │
+│   Flash:  2.3MB / 8MB      ✓       │
+│   RAM:    380KB / 512KB    ⚠ tight  │
+│   Ops:    all supported    ✓       │
+│   Latency: ~95ms estimated          │
+├─────────────────────────────────────┤
+│ Status: FEASIBLE                    │
+│ Output: ./output/model_esp32s3/     │
+└─────────────────────────────────────┘

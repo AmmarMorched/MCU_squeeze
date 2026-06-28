@@ -1,0 +1,50 @@
+cat > .gitignore << 'EOF'
+# Virtual environment
+venv/
+env/
+mcu/
+.env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+
+# Package build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Distribution / packaging
+.Python
+wheels/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.onnx
+*.h5
+*.tflite
+*.pb
+calibration_data/
+output/
+
+# Secrets
+.env
+*.key
+EOF
