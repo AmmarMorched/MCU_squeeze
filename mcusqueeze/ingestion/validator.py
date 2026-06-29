@@ -4,7 +4,10 @@ import onnx
 from onnx import shape_inference
 from pathlib import Path
 
-def validate_onnx(path: str) -> dict:
+from mcusqueeze.analysis.graph import extract_ops_from_graph, get_input_output_shapes,get_model_summary,get_layer_wise_memory
+
+
+def validate_onnx(path: str, extract_ops:bool = False, extract_shapes:bool = False) -> dict:
     
     issues = []
     warnings = []
@@ -32,7 +35,9 @@ def validate_onnx(path: str) -> dict:
     
     # 5. Shape inference
     try:
-        shape_inference.infer_shapes(model)
+        inferred_model = shape_inference.infer_shapes(model)
+        model = inferred_model
+        #shape_inference.infer_shapes(model)
     except Exception as e:
         warnings.append(f"Shape inference failed: {e}")
     
@@ -43,7 +48,32 @@ def validate_onnx(path: str) -> dict:
             for dim in shape.dim:
                 if dim.dim_value == 0:
                     warnings.append(f"Dynamic shape in input '{inp.name}' — declare static shape for MCU deployment")
-    
+    #7 Extract operations(new - pure extraction, no conversion)
+    op_analysis=None
+    if extract_ops:
+        try:
+            op_analysis= extract_ops_from_graph(model)
+            #Add summary to warning for vsibility 
+            warnings.append(f"Found {op_analysis['total_ops']} operation across {len(op_analysis['unique_ops'])} types")
+        except Exception as e:
+            warnings.append(f"operation extract failed: {e}")
+
+
+    #8 Extract input/output shapes
+    io_shapes = None
+    if extract_shapes:
+        try:
+            io_shapes = get_input_output_shapes(model)
+            for inp in io_shapes['inputs']:
+                warnings.append(f"Input '{inp['name']}': {inp['shape_str']}")
+            for out in io_shapes['outputs']:
+                warnings.append(f"Output '{out['name']}': {out['shape_str']}")
+
+            memory = get_layer_wise_memory(model)
+            warnings.append(f"Estimated memory: {memory['total_memory_kb']:.2f} KB ({memory['total_memory_mb']:.2f} MB)")
+        except Exception as e :
+            warnings.append(f"shape extraction failed: {e}")
+
     if issues:
         return {'valid': False, 'reason': issues[0]}
     
@@ -51,5 +81,7 @@ def validate_onnx(path: str) -> dict:
         'valid': True,
         'warnings': warnings,
         'opset': opset,
-        'model': model
+        'model': model,
+        'op_analysis': op_analysis,
+        'io_shapes': io_shapes,
     }
