@@ -10,13 +10,13 @@ The 4 Week Roadmap:
 Week 1 — Foundation
 Goal: model goes in, clean ONNX comes out, graph is analyzed
 Day 1-2: Project setup
-  - GitHub repo
-  - Python package structure
-  - CLI skeleton with click
-  - virtual environment + dependencies
+  - GitHub repo*************************************
+  - Python package structure****************************************
+  - CLI skeleton with click******************************************
+  - virtual environment + dependencies*******************************
 
 Day 3-4: Format ingestion
-  - .onnx passthrough + validation
+  - .onnx passthrough + validation *******************************
   - .h5 → onnx via tf2onnx
   - basic error handling for both
 
