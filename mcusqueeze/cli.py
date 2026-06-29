@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from mcusqueeze.ingestion.loader import load_model
+from mcusqueeze.exceptions import MCUSqeezeError
 
 console = Console()
 
@@ -24,7 +25,7 @@ def analyze(model):
     try: 
         onnx_model = load_model(model)
         console.print(f"[green]✓[/] Model ready for analysis")
-    except (ValueError, FileNotFoundError) as e:
+    except MCUSqeezeError as e:
         console.print(f"[red]✗[/] Error: {e}")
     
     # placeholder for now

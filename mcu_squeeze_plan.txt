@@ -17,7 +17,7 @@ Day 1-2: Project setup
 
 Day 3-4: Format ingestion
   - .onnx passthrough + validation *******************************
-  - .h5 → onnx via tf2onnx
+  - .h5 → onnx via tf2onnx **************************************
   - basic error handling for both
 
 Day 5-7: ONNX graph analyzer
