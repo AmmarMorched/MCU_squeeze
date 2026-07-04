@@ -118,7 +118,16 @@ def format_shape(shape) -> str:
     """Format a shape for display."""
     if shape is None:
         return "?"
-    return f"({','.join(str(d) if d != -1 else '?' for d in shape)})"
+    if not shape:
+        return "()"
+    
+    parts = []
+    for d in shape:
+        if d == -1:
+            parts.append("?")
+        else:
+            parts.append(str(d))
+    return f"({','.join(parts)})"
 
 def get_model_summary(model: onnx.ModelProto) -> str:
     """
@@ -147,7 +156,7 @@ def get_model_summary(model: onnx.ModelProto) -> str:
         input_shape_str = " → ".join([format_shape(s) for s in input_shapes])
         output_shape_str = " → ".join([format_shape(s) for s in output_shapes])
 
-        lines.append(f"  [{op_name}] {op_type}")
+        lines.append(f"  {op_name} [{op_type}]")
         lines.append(f"    Inputs:  {input_shape_str}")
         lines.append(f"    Outputs: {output_shape_str}")
 

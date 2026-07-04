@@ -1,9 +1,12 @@
 from pathlib import Path
+from typing import Optional
 from rich.console import Console
 from .validator import validate_onnx
 from .h5_converter import convert_h5_to_onnx
 from mcusqueeze.analysis.graph import get_model_summary, get_input_output_summary
 from mcusqueeze.analysis.compatibility import get_compatibility_summary
+from mcusqueeze.analysis.memory import get_memory_summary
+from .pt_converter import convert_pt_to_onnx
 from mcusqueeze.exceptions import (
     FileNotFoundError,
     EmptyFileError,
@@ -16,7 +19,12 @@ from mcusqueeze.exceptions import (
 
 console = Console()
     
-def load_model(path: str, extract_ops:bool = False, extract_shapes:bool=False, target:str='esp32s3'):
+def load_model(path: str, 
+               extract_ops:bool = False, 
+               extract_shapes:bool=False, 
+               target:str='esp32s3',
+                input_height: Optional[int] = None,
+                input_width: Optional[int] = None):
 
     path = Path(path)
 
@@ -36,7 +44,13 @@ def load_model(path: str, extract_ops:bool = False, extract_shapes:bool=False, t
         console.print(f"[cyan]→[/] ONNX model detected — validating...")
         
         try:
-            result = validate_onnx(str(path), extract_ops=extract_ops, extract_shapes=extract_shapes, target=target)
+            result = validate_onnx(
+                str(path), 
+                extract_ops=extract_ops, 
+                extract_shapes=extract_shapes, 
+                target=target,
+                input_height=input_height,
+                input_width=input_width)
         except PermissionError:
             raise InvalidONNXError(path)
         
@@ -57,13 +71,12 @@ def load_model(path: str, extract_ops:bool = False, extract_shapes:bool=False, t
 
         if extract_shapes and result.get('model_size'):
             console.print("[cyan]→[/] Model Size:")
-            from mcusqueeze.analysis.memory import get_memory_summary
             console.print(get_memory_summary(result['model']))
 
 
         if extract_shapes and result.get('comptability'):
-            console.print("[cyan]→[/] Target Compatibility:")
-            console.print(get_compatibility_summary(result['compatibility']))
+            console.print("[cyan]→[/] Target comptability:")
+            console.print(get_compatibility_summary(result['comptability']))
 
         console.print(f"[green]✓[/] ONNX validated (opset {result['opset']})")
         return result['model']
@@ -88,16 +101,61 @@ def load_model(path: str, extract_ops:bool = False, extract_shapes:bool=False, t
             console.print("[cyan]→[/] Model Inputs/Outputs:")
             console.print(get_input_output_summary(result['model']))
 
+        if extract_shapes and result.get('model_size'):
+            console.print("[cyan]→[/] Model Size:")
+            console.print(get_memory_summary(result['model']))
+
         if extract_ops and result.get('op_analysis'):
             console.print("[cyan]→[/] Extracted operations:")
             console.print(get_model_summary(result['model']))
 
-        if extract_shapes and result.get('compatibility'):
-            console.print("[cyan]→[/] Target Compatibility:")
-            console.print(get_compatibility_summary(result['compatibility']))
+        if extract_shapes and result.get('comptability'):
+            console.print("[cyan]→[/] Target comptability:")
+            console.print(get_compatibility_summary(result['comptability']))
 
         console.print(f"[green]✓[/] Converted ONNX validated (opset {result['opset']})")
         return result['model']
     
+    elif ext == '.pt':
+        console.print(f"[cyan]→[/] PyTorch model detected — converting to ONNX...")
+        
+        try:
+            onnx_path = convert_pt_to_onnx(path)
+        except ValueError as e:
+            raise ConversionError(str(e))
+        except ImportError as e:
+            raise ConversionError(str(e))
+        
+        # Validate the converted ONNX model
+        result = validate_onnx(onnx_path, extract_ops=extract_ops, extract_shapes=extract_shapes, target=target)
+        
+        if not result['valid']:
+            raise InvalidONNXError(result['reason'])
+        
+        # Display results
+        if extract_shapes and result.get('io_shapes'):
+            console.print("[cyan]→[/] Model Inputs/Outputs:")
+            console.print(get_input_output_summary(result['model']))
+        
+        if extract_ops and result.get('op_analysis'):
+            console.print("[cyan]→[/] Extracted operations:")
+            console.print(get_model_summary(result['model']))
+        
+        if extract_shapes and result.get('model_size'):
+            console.print("[cyan]→[/] Model Size:")
+            console.print(get_memory_summary(result['model']))
+        
+        if extract_shapes and result.get('compatibility'):
+            console.print("[cyan]→[/] Target Compatibility:")
+            console.print(get_compatibility_summary(result['compatibility']))
+        
+        console.print(f"[green]✓[/] Converted ONNX validated (opset {result['opset']})")
+        return result['model']
+
+    
     else:
         raise UnsupportedFormatError(ext, path.name)
+    
+
+
+    

@@ -50,7 +50,7 @@ class UnsupportedFormatError(MCUSqeezeError):
         self.filename = filename
         super().__init__(
             f"Unsupported format: '{ext}'\n"
-            f"  Supported formats: .onnx  .h5  .keras\n"
+            f"  Supported formats: .onnx  .h5  .keras, .pt \n"
             f"  Got: {filename}"
         )
 

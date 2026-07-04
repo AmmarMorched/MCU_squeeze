@@ -135,3 +135,5 @@ def get_compatibility_summary(compat: Dict) -> str:
             lines.append(f"    • {warning}")
     
     return "\n".join(lines)
+
+
