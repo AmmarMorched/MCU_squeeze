@@ -43,7 +43,8 @@ Thumbs.db
 *.pb
 calibration_data/
 output/
-
+info.txt
+tests/
 # Secrets
 .env
 *.key

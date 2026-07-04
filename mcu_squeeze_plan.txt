@@ -33,9 +33,9 @@ Deliverable: mcusqueeze --model model.h5 --analyze prints a clean graph report.
 Week 2 — Quantization Pipeline
 Goal: float32 model → int8 quantized model
 Day 8-9: Calibration dataset loader
-  - accept folder of images
-  - preprocessing pipeline (resize, normalize)
-  - generator for ONNX Runtime
+  - accept folder of images ******************************
+  - preprocessing pipeline (resize, normalize)****************
+  - generator for ONNX Runtime**************************
 
 Day 10-12: PTQ quantization
   - onnxruntime.quantization

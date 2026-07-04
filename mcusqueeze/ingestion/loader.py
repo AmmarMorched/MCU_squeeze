@@ -24,7 +24,8 @@ def load_model(path: str,
                extract_shapes:bool=False, 
                target:str='esp32s3',
                 input_height: Optional[int] = None,
-                input_width: Optional[int] = None):
+                input_width: Optional[int] = None,
+                output_path: Optional[str] = None):
 
     path = Path(path)
 
@@ -85,7 +86,7 @@ def load_model(path: str,
         console.print(f"[cyan]→[/] Keras model detected — converting to ONNX...")
 
         try:
-            onnx_path = convert_h5_to_onnx(path)
+            onnx_path = convert_h5_to_onnx(path, output_path=output_path)
         except PermissionError:
             raise PermissionError(path)
         except ValueError as e:
@@ -120,7 +121,7 @@ def load_model(path: str,
         console.print(f"[cyan]→[/] PyTorch model detected — converting to ONNX...")
         
         try:
-            onnx_path = convert_pt_to_onnx(path)
+            onnx_path = convert_pt_to_onnx(path, output_path= output_path)
         except ValueError as e:
             raise ConversionError(str(e))
         except ImportError as e:
