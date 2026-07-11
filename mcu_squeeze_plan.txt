@@ -38,15 +38,15 @@ Day 8-9: Calibration dataset loader
   - generator for ONNX Runtime**************************
 
 Day 10-12: PTQ quantization
-  - onnxruntime.quantization
-  - static quantization with calibration
-  - per-channel quantization
-  - output: quantized .onnx
+  - onnxruntime.quantization  ********************
+  - static quantization with calibration **********************
+  - per-channel quantization *******************************
+  - output: quantized .onnx ********************
 
 Day 13-14: Quantization validation
   - compare accuracy before/after on calibration set
   - report accuracy delta
-  - report size reduction
+  - report size reduction **********************************
   - handle quantization failures gracefully
 Deliverable: mcusqueeze --model model.h5 --calib ./data --quantize outputs quantized model + accuracy report.
 

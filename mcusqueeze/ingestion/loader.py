@@ -80,7 +80,7 @@ def load_model(path: str,
             console.print(get_compatibility_summary(result['comptability']))
 
         console.print(f"[green]✓[/] ONNX validated (opset {result['opset']})")
-        return result['model']
+        return result['model'], str(path)
     
     elif ext in ['.h5', '.keras']:
         console.print(f"[cyan]→[/] Keras model detected — converting to ONNX...")
@@ -115,7 +115,7 @@ def load_model(path: str,
             console.print(get_compatibility_summary(result['comptability']))
 
         console.print(f"[green]✓[/] Converted ONNX validated (opset {result['opset']})")
-        return result['model']
+        return result['model'], str(onnx_path)
     
     elif ext == '.pt':
         console.print(f"[cyan]→[/] PyTorch model detected — converting to ONNX...")
@@ -151,7 +151,7 @@ def load_model(path: str,
             console.print(get_compatibility_summary(result['compatibility']))
         
         console.print(f"[green]✓[/] Converted ONNX validated (opset {result['opset']})")
-        return result['model']
+        return result['model'], str(onnx_path)
 
     
     else:
