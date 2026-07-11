@@ -50,3 +50,6 @@ tests/
 .env
 *.key
 EOF
+
+
+datasets/*
