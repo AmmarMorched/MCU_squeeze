@@ -224,12 +224,24 @@ class PTQ:
             Path to the preprocessed model file
         """
         preprocessed_path = self.model_path.parent / f"{self.model_path.stem}_preprocessed.onnx"
-        
+
+        # quant_pre_process calls onnx.save_model(..., "sym_shape_infer_temp.onnx",
+        # save_as_external_data=True) relative to the CURRENT working directory, which
+        # leaves an orphaned "<uuid>.data" weight file (and sym_shape_infer_temp.onnx)
+        # next to cwd on every run. Sandbox the call in a temp dir and clean it up.
+        import tempfile
+
         try:
-            quant_pre_process(
-                str(self.model_path),
-                str(preprocessed_path),
-            )
+            with tempfile.TemporaryDirectory(prefix="mcusqueeze_preproc_") as tmpdir:
+                cwd = os.getcwd()
+                os.chdir(tmpdir)
+                try:
+                    quant_pre_process(
+                        str(self.model_path),
+                        str(preprocessed_path),
+                    )
+                finally:
+                    os.chdir(cwd)
             return preprocessed_path
         except Exception as e:
             print(f"⚠️ Model preprocessing warning: {e}")
@@ -368,3 +380,5 @@ def get_quantization_options_for_target(target: str) -> Dict[str, Any]:
     }
     
     return options.get(target, options['esp32s3'])
+
+

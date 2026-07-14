@@ -1,13 +1,9 @@
-from roboflow import Roboflow
+import torch
+import torchvision
 
-rf = Roboflow(api_key="EyR2nq8F7lqbnnIyKzW4")
-project = rf.workspace("pramanarendra").project("web-ui-element-detection")
-version = project.version(1)
+# Load a pre-trained model (e.g., ResNet-18)
+model = torchvision.models.resnet18(pretrained=True).eval()
+dummy_input = torch.randn(1, 3, 224, 224)
 
-# Download to a specific folder
-dataset = version.download(
-    model_format="yolov8",
-    location="./datasets/web-ui-detection"  # 👈 Your specified path
-)
-
-print(f"Dataset downloaded to: {dataset.location}")
+# Export to ONNX
+torch.onnx.export(model, dummy_input, "resnet18.onnx")

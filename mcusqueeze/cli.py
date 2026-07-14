@@ -22,7 +22,7 @@ from mcusqueeze.ingestion.loader import load_model
 from mcusqueeze.exceptions import MCUSqeezeError
 from mcusqueeze.targets import SUPPORTED_TARGETS, DEFAULT_TARGET, get_available_targets
 from mcusqueeze.analysis.dimensions import detect_dynamic_dimensions, suggest_default_dimensions, get_model_input_shapes
-
+from mcusqueeze.utils.error_handling import handle_quantization_error, QuantizationError, run_quantization_with_retry
 console = Console()
 
 
@@ -147,7 +147,7 @@ def analyze(model, shapes, target, input_size, yes):
 
     try:
         # First load to check for dynamic dimensions
-        onnx_model = load_model(
+        onnx_model, onnx_path = load_model(
             model,
             extract_ops=True,
             extract_shapes=shapes,
@@ -211,7 +211,7 @@ def analyze(model, shapes, target, input_size, yes):
             console.print(f"[yellow]⚠[/] Using default dimensions: {input_height}x{input_width} (--yes flag)")
         
         # Re-load with dimensions for memory estimation
-        onnx_model = load_model(
+        onnx_model, _ = load_model(
             model,
             extract_ops=True,
             extract_shapes=shapes,
@@ -493,15 +493,45 @@ def run(model, calib, target, output, batch_size, max_samples, input_size, yes, 
                 channel_order=channel_order,
                 **target_options,
             )
+
+            quantized_path = run_quantization_with_retry(
+                quantizer=quantizer,
+                calib=calib,
+                input_name=input_name,
+                height=height,
+                width = width,
+                channels=channels,
+                batch_size=batch_size,
+                max_samples=max_samples,
+                channel_order=channel_order,
+                target_options=target_options,
+            )
             
             console.print(f"[green]✓[/] Quantized model saved to: {quantized_path}")
             
         except ImportError as e:
-            console.print("[red]✗[/] ONNX Runtime quantization not available")
-            console.print("   Install required packages:")
-            console.print("   pip install onnxruntime-quantization")
-            console.print(f"   Error: {e}")
-            quantized_path = None
+            # console.print("[red]✗[/] ONNX Runtime quantization not available")
+            # console.print("   Install required packages:")
+            # console.print("   pip install onnxruntime-quantization")
+            # console.print(f"   Error: {e}")
+
+            context = {
+                'model':model,
+                'target': target,
+                'input_name': input_name,
+                'input_shape': input_shape,
+                'batch_size':batch_size,
+                'max_samples': max_samples,
+            }
+
+            should_retry = handle_quantization_error(e, context)
+            if should_retry:
+                console.print("\n[cyan]Retrying quantization with adjusted settings...[/cyan]")
+
+
+            else:
+                console.print("[red]Aborting quantization pipeline.[/red]")
+                quantized_path = None
         except Exception as e:
             console.print(f"[red]✗[/] Quantization failed: {e}")
             traceback.print_exc()
@@ -532,9 +562,15 @@ def run(model, calib, target, output, batch_size, max_samples, input_size, yes, 
 
 
 def await_run_validation(onnx_path, quantized_path, calib, input_name, height, width, channels, batch_size, max_samples, channel_order, data_yaml):
-    """Handle model validation with support for YOLO."""
+    """Handle model validation (model-agnostic).
+
+    The universal fidelity/agreement validator runs for EVERY model and
+    needs no labels. If --data-yaml is provided AND ultralytics can score
+    the float32 model, the detector-specific mAP is shown as an extra
+    (informational) line — it never blocks the universal report.
+    """
     console.print("\n[cyan]→[/] Validating quantized model...")
-    
+
     if not Path(onnx_path).exists():
         console.print(f"[red]✗[/] Float32 model not found: {onnx_path}")
         console.print("   Skipping validation...")
@@ -543,49 +579,29 @@ def await_run_validation(onnx_path, quantized_path, calib, input_name, height, w
         console.print(f"[red]✗[/] Quantized model not found: {quantized_path}")
         console.print("   Skipping validation...")
         return
-    
-    try:
-        # Try YOLO validation if data.yaml is provided
-        if data_yaml and Path(data_yaml).exists():
-            console.print(f"   Using YOLO validation with data.yaml: {data_yaml}")
+
+    # Optional detector enhancement (non-blocking).
+    if data_yaml:
+        if Path(data_yaml).exists():
             try:
-                validation_results = validate_yolo_model(
+                res = validate_yolo_model(
                     float32_model_path=onnx_path,
                     quantized_model_path=quantized_path,
                     data_yaml=data_yaml,
                     device='cpu',
                 )
-                
-                if validation_results:
-                    float32_map = validation_results['float32']['map50']
-                    quantized_map = validation_results['quantized']['map50']
-                    delta = validation_results['deltas']['map50']
-                    
-                    console.print(f"[green]✓[/] YOLO validation complete!")
-                    console.print(f"   Float32 mAP@0.5:   {float32_map:.3f}")
-                    console.print(f"   Quantized mAP@0.5: {quantized_map:.3f}")
-                    console.print(f"   Delta:             {delta:.3f} ({delta*100:.1f}%)")
-                    
-                    if validation_results['passed']:
-                        console.print("[green]✅ Quantization passed![/green]")
-                    else:
-                        console.print("[yellow]⚠️ Quantization warning! mAP drop > 5%[/yellow]")
-                return
-                
-            except ImportError:
-                console.print("[yellow]⚠️[/] YOLO validation not available (install ultralytics)")
-                console.print("   Falling back to basic validation...")
+                if res and res.get('float32'):
+                    m = res['float32'].get('map50')
+                    if m is not None:
+                        console.print(f"[cyan]ℹ️[/] Reference float32 mAP@0.5: {m:.3f} (detector baseline)")
             except Exception as e:
-                console.print(f"[yellow]⚠️[/] YOLO validation failed: {e}")
-                console.print("   Falling back to basic validation...")
+                console.print(f"[yellow]⚠️[/] Detector mAP check skipped: {e}")
         else:
-            if data_yaml:
-                console.print(f"[yellow]⚠️[/] data.yaml not found: {data_yaml}")
-            console.print("   Using basic validation (no mAP calculation)")
-            console.print("   For mAP metrics, provide --data-yaml")
-        
-        # Fallback to basic validation
-        validation_results = validate_quantization(
+            console.print(f"[yellow]⚠️[/] --data-yaml not found: {data_yaml} (ignored)")
+
+    # Universal, model-agnostic validation (always runs).
+    try:
+        validate_quantization(
             float32_model_path=onnx_path,
             quantized_model_path=quantized_path,
             validation_folder=calib,
@@ -593,20 +609,8 @@ def await_run_validation(onnx_path, quantized_path, calib, input_name, height, w
             input_shape=(height, width, channels),
             batch_size=batch_size,
             max_samples=max_samples,
-            channel_order=channel_order
+            channel_order=channel_order,
         )
-        
-        if validation_results:
-            float32_acc = validation_results['float32'].get('accuracy_percent', 0)
-            quantized_acc = validation_results['quantized'].get('accuracy_percent', 0)
-            delta = float32_acc - quantized_acc if float32_acc and quantized_acc else 0
-            
-            if delta < 5:
-                console.print(f"[green]✅ Validation passed! (Accuracy drop: {delta:.2f}%)[/green]")
-            else:
-                console.print(f"[yellow]⚠️ Validation warning: Accuracy drop of {delta:.2f}%[/yellow]")
-                console.print("   Consider using more calibration samples or different quantization settings.")
-        
     except ImportError as e:
         console.print(f"[yellow]⚠️[/] Validation module not available: {e}")
     except Exception as e:

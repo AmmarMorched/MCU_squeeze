@@ -47,7 +47,7 @@ Day 13-14: Quantization validation
   - compare accuracy before/after on calibration set
   - report accuracy delta
   - report size reduction **********************************
-  - handle quantization failures gracefully
+  - handle quantization failures gracefully 
 Deliverable: mcusqueeze --model model.h5 --calib ./data --quantize outputs quantized model + accuracy report.
 
 Week 3 — ESP32-S3 Conversion + Feasibility
